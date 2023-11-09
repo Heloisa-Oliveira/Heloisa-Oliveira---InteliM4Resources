@@ -2,16 +2,19 @@
    Simon Game using ESP32
 */
 
-/* Constants - define pin numbers for LEDs and buttons: */
-const uint8_t ledPins[] = {33, 25, 26, 27};
+/* Constants - define pin numbers for LEDs and buttons
+  Obs: there is an extra pin to send a signal when 
+  the reset button is pressed */
+const uint8_t ledPins[] = {33, 25, 26, 27, 21};
 const uint8_t buttonPins[] = {19, 18, 5, 17};
 int but_reset = 16;
 
-#define MAX_GAME_LENGTH 100
+#define MAX_GAME_LENGTH 5
 
 /* Global variables - store the game state */
 uint8_t gameSequence[MAX_GAME_LENGTH] = {0};
 uint8_t gameIndex = 0;
+uint8_t userSequence[MAX_GAME_LENGTH] = {0};
 
 /**
    Set up the ESP32 and initialize Serial communication
@@ -24,8 +27,8 @@ void setup() {
   }
   pinMode(but_reset, INPUT_PULLUP);
 
-  // The following line primes the random number generator.
-  // It assumes pin 32 is floating (disconnected):
+  /* The following line primes the random number generator.
+   It assumes pin 32 is floating (disconnected) */
   randomSeed(analogRead(32));
 }
 
@@ -52,11 +55,15 @@ void playSequence() {
 
 /**
     Waits until the user pressed one of the buttons,
-    and returns the index of that button
+    and returns the index of that button, 
 */
 byte readButtons() {
   while (true) {
     for (byte i = 0; i < 4; i++) {
+      bool check = checkReset();
+      if (check == true){
+        return 4;
+      }
       checkReset();
       byte buttonPin = buttonPins[i];
       if (digitalRead(buttonPin) == LOW) {
@@ -68,37 +75,37 @@ byte readButtons() {
 }
 
 /**
-  Play the game over sequence, and report the game score
+  Play the game over sequence
 */
 void gameOver() {
-  Serial.print("Game over! your score: ");
-  Serial.println(gameIndex - 1);
   gameIndex = 0;
   delay(200);
 
 }
 
 /**
-   Get the user's input and compare it with the expected sequence.
+   Get the user's input and compare it with the expected sequence
 */
 bool checkUserSequence() {
   for (int i = 0; i < gameIndex; i++) {
     byte expectedButton = gameSequence[i];
-    byte actualButton = readButtons();
-    lightLed(actualButton);
-    if (expectedButton != actualButton) {
+    userSequence[i] = readButtons();
+    lightLed(userSequence[i]);
+    if (expectedButton != userSequence[i]) {
       return false;
     }
   }
-
   return true;
 }
 
+
 /* Check if the reset button is pressed */
-void checkReset(){
+bool checkReset(){
   if(digitalRead(but_reset) == 0){
-    gameOver();
+    gameIndex = 0;
+    return true;
   }
+  return false;
 }
 
 /**
@@ -106,14 +113,15 @@ void checkReset(){
 */
 void loop() {
 
-  // Add a random color to the end of the sequence
+  /* Add a random color to the end of the sequence */
   gameSequence[gameIndex] = random(0, 4);
   gameIndex++;
 
   checkReset();
 
+  /* Ends the game when reached the max_game length */
   if (gameIndex >= MAX_GAME_LENGTH) {
-    gameIndex = MAX_GAME_LENGTH - 1;
+    gameOver();
   }
 
   checkReset();
